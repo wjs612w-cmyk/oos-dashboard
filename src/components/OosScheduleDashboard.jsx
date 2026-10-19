@@ -195,37 +195,63 @@ export default function OosScheduleDashboard() {
     return () => clearInterval(t);
   }, [load]);
 
+  // 현재 선택된 필터를 모두 반영해서 건수를 계산한다. 상단 상태 카드만 skip="status"로 상태 필터를 제외해 서로 비교할 수 있게 한다
+  const matches = useCallback(
+    (d, skip) => {
+      const k = q.trim().toLowerCase();
+      return (
+        (skip === "status" || status === "전체" || STATUS[d.st] === status) &&
+        (sheet === "전체" || d.sheet === sheet) &&
+        (skip === "cat" || cat === "전체" || d.cat === cat) &&
+        (skip === "ch" || ch === "전체" || d.ch === ch) &&
+        (!k || d.name.toLowerCase().includes(k) || d.code.includes(k))
+      );
+    },
+    [status, sheet, cat, ch, q]
+  );
+
   const counts = useMemo(() => {
     const c = [0, 0, 0];
-    data.forEach((d) => { c[d.st] += 1; });
+    data.forEach((d) => { if (matches(d, "status")) c[d.st] += 1; });
     return c;
-  }, [data]);
+  }, [data, matches]);
 
   const catCounts = useMemo(() => {
     const c = {};
-    data.forEach((d) => { c[d.cat] = (c[d.cat] || 0) + 1; });
+    data.forEach((d) => { if (matches(d)) c[d.cat] = (c[d.cat] || 0) + 1; });
     return c;
-  }, [data]);
+  }, [data, matches]);
+
+  const chCounts = useMemo(() => {
+    const c = { 일반: 0, 로켓: 0, 전체: 0 };
+    data.forEach((d) => {
+      if (!matches(d)) return;
+      c.전체 += 1;
+      if (d.ch) c[d.ch] += 1;
+    });
+    return c;
+  }, [data, matches]);
 
   const rows = useMemo(() => {
-    const k = q.trim().toLowerCase();
     const etaKey = (r) => { const d = parseEta(r.eta); return d ? d.getTime() : 9e15; };
     const catOrder = (c) => { const i = CATS.indexOf(c); return i < 0 ? 99 : i; };
     return data
-      .filter((d) =>
-        (status === "전체" || STATUS[d.st] === status) &&
-        (sheet === "전체" || d.sheet === sheet) &&
-        (cat === "전체" || d.cat === cat) &&
-        (ch === "전체" || d.ch === ch) &&
-        (!k || d.name.toLowerCase().includes(k) || d.code.includes(k)))
+      .filter((d) => matches(d))
       .sort((a, b) => (group ? catOrder(a.cat) - catOrder(b.cat) : 0) || a.st - b.st || etaKey(a) - etaKey(b));
-  }, [data, status, sheet, cat, ch, group, q]);
+  }, [data, matches, group]);
 
+  const totalCount = counts[0] + counts[1] + counts[2];
   const kpis = [
-    { key: "전체", label: "전체 품절 관련", value: data.length, cls: "border-slate-200 bg-white text-slate-700" },
+    { key: "전체", label: "전체 품절 관련", value: totalCount, cls: "border-slate-200 bg-white text-slate-700" },
     ...STATUS.map((s, i) => ({ key: s, label: s, value: counts[i], cls: STYLE[i].card })),
   ];
-  const catOptions = [{ v: "전체", l: `전체 ${data.length}` }, ...CATS.map((c) => ({ v: c, l: `${c} ${catCounts[c] || 0}` }))];
+  const catTotal = Object.values(catCounts).reduce((a, b) => a + b, 0);
+  const catOptions = [{ v: "전체", l: `전체 ${catTotal}` }, ...CATS.map((c) => ({ v: c, l: `${c} ${catCounts[c] || 0}` }))];
+  const chOptions = [
+    { v: "전체", l: `전체 ${chCounts.전체}` },
+    { v: "일반", l: `일반 ${chCounts.일반}` },
+    { v: "로켓", l: `로켓 ${chCounts.로켓}` },
+  ];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -302,7 +328,7 @@ export default function OosScheduleDashboard() {
           </div>
           <div>
             <div className="mb-1.5 text-xs font-semibold text-slate-500">마스크 구분</div>
-            <Pills value={ch} onChange={setCh} options={["전체", "일반", "로켓"].map((v) => ({ v, l: v }))} />
+            <Pills value={ch} onChange={setCh} options={chOptions} />
           </div>
           <button
             onClick={() => setGroup(!group)}
