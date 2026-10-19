@@ -17,6 +17,12 @@ const HIDE_ETA = /^(DROP|단종|드롭)/i; // 입고예정일이 단종/드롭�
 
 /* ───────── 파싱 유틸 ───────── */
 const norm = (s) => String(s ?? "").replace(/\s+/g, "");
+const toDays = (v) => {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  const x = parseFloat(s.replace(/[^0-9.\-]/g, ""));
+  return Number.isFinite(x) ? Math.round(x) : null;
+};
 const toNum = (v) => {
   const n = parseFloat(String(v ?? "").replace(/[^0-9.\-]/g, ""));
   return Number.isFinite(n) ? n : 0;
@@ -24,7 +30,7 @@ const toNum = (v) => {
 const ALIAS = {
   tier: ["주력구분"], code: ["품번"], name: ["상품명"], cat: ["카테고리"],
   stock: ["일반통합재고", "쿠팡재고"], base: ["소진기준량"], status: ["재고상태", "품절상태"],
-  eta: ["입고예정일"], qty: ["입고예정수량"], memo: ["특이사항"], channel: ["일반/로켓여부"],
+  days: ["예상소진일"], depDate: ["소진일자"], eta: ["입고예정일"], qty: ["입고예정수량"], memo: ["특이사항"], channel: ["일반/로켓여부"],
 };
 const buildIndex = (header) => {
   const h = header.map(norm);
@@ -61,7 +67,8 @@ function parseOos(rows, sheet, channelMap) {
       minor: norm(r[idx.tier]) === "비주력",
       ch: cat === "마스크" ? channelMap.get(code) || "" : "",
       stock: toNum(r[idx.stock]), base: toNum(r[idx.base]),
-      eta, qty: toNum(r[idx.qty]), memo: String(r[idx.memo] ?? "").trim(),
+      eta, qty: toNum(r[idx.qty]),
+      days: toDays(r[idx.days]), depDate: String(r[idx.depDate] ?? "").trim(), memo: String(r[idx.memo] ?? "").trim(),
     });
   });
   return out;
@@ -134,6 +141,17 @@ function Dday({ eta, qty }) {
       <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${cls}`}>{label}</span>
       <span className="text-xs text-slate-500">{fmtDate(d)}</span>
       {q}
+    </div>
+  );
+}
+
+function Depletion({ days, date }) {
+  if (days == null) return null;
+  const dt = parseEta(date);
+  return (
+    <div className="mt-1 text-xs text-slate-500">
+      예상소진 <b className={days <= 0 ? "text-red-600" : "text-slate-800"}>{days}일</b>
+      {dt && ` (${dt.getMonth() + 1}.${dt.getDate()})`}
     </div>
   );
 }
@@ -306,7 +324,7 @@ export default function OosScheduleDashboard() {
           <table className="w-full min-w-[1040px] text-sm">
             <thead className="sticky top-0 z-10 bg-slate-50 text-left text-xs font-semibold text-slate-500">
               <tr>
-                {["출처 시트", "카테고리", "품목코드", "품목명", "상태", "현재고 / 소진기준량", "입고 예정일", "담당자 / 비고"].map((h) => (
+                {["출처 시트", "카테고리", "품목코드", "품목명", "상태 / 예상소진", "현재고 / 소진기준량", "입고 예정일", "담당자 / 비고"].map((h) => (
                   <th key={h} className="whitespace-nowrap px-4 py-3">{h}</th>
                 ))}
               </tr>
@@ -349,6 +367,7 @@ export default function OosScheduleDashboard() {
                           <span className={`h-1.5 w-1.5 rounded-full ${STYLE[d.st].dot}`} />
                           {STATUS[d.st]}
                         </span>
+                        <Depletion days={d.days} date={d.depDate} />
                       </td>
                       <td className="w-44 px-4 py-3">
                         <div className="text-xs">
