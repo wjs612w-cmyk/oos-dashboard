@@ -28,7 +28,7 @@ const toNum = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 const ALIAS = {
-  tier: ["주력구분"], code: ["품번"], name: ["상품명"], cat: ["카테고리"],
+  tier: ["주력구분"], code: ["품번", "바코드"], name: ["상품명"], cat: ["카테고리"],
   stock: ["일반통합재고", "쿠팡재고"], base: ["소진기준량"], status: ["재고상태", "품절상태"],
   days: ["예상소진일"], depDate: ["소진일자"], eta: ["입고예정일"], qty: ["입고예정수량"], memo: ["특이사항"], channel: ["일반/로켓여부"],
 };
